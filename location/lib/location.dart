@@ -48,6 +48,14 @@ class Location {
     return LocationPlatform.instance.getLocation();
   }
 
+  /// Gets the true current location of the user. (Android only)
+  ///
+  /// Throws an error if the app has no permission to access location.
+  /// Returns a [LocationData] object.
+  Future<LocationData> getCurrentLocation() async {
+    return LocationPlatform.instance.getCurrentLocation();
+  }
+
   /// Checks if the app has permission to access location.
   ///
   /// If the result is [PermissionStatus.deniedForever], no dialog will be

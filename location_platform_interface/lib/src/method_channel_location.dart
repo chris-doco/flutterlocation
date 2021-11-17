@@ -82,6 +82,16 @@ class MethodChannelLocation extends LocationPlatform {
     return LocationData.fromMap(resultMap);
   }
 
+  /// Gets the true current location of the user. (Android only)
+  ///
+  /// Throws an error if the app has no permission to access location.
+  /// Returns a [LocationData] object.
+  @override
+  Future<LocationData> getCurrentLocation() async {
+    final Map<String, double> resultMap = await _methodChannel.invokeMapMethod('getCurrentLocation');
+    return LocationData.fromMap(resultMap);
+  }
+
   @override
   Future<PermissionStatus> hasPermission() async {
     final int result = await _methodChannel.invokeMethod('hasPermission');

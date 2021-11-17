@@ -429,4 +429,95 @@ public class FlutterLocation
                 });
     }
 
+    public void getCurrentLocation() {
+        if (this.activity == null) {
+            throw new ActivityNotFoundException();
+        }
+        mSettingsClient.checkLocationSettings(mLocationSettingsRequest)
+                .addOnSuccessListener(activity, new OnSuccessListener<LocationSettingsResponse>() {
+                    @Override
+                    public void onSuccess(LocationSettingsResponse locationSettingsResponse) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                            locationManager.addNmeaListener(mMessageListener);
+                        }
+
+                        if (mFusedLocationClient != null) {
+                            Task<Location> locationTask = mFusedLocationClient.getCurrentLocation(locationAccuracy,
+                                    null);
+                            locationTask.addOnCompleteListener(new OnCompleteListener<Location>() {
+                                @Override
+                                public void onComplete(@NonNull Task<Location> task) {
+                                    if (task.isSuccessful()) {
+                                        Location location = task.getResult();
+                                        if (location != null) {
+                                            HashMap<String, Double> loc = new HashMap<>();
+                                            loc.put("latitude", location.getLatitude());
+                                            loc.put("longitude", location.getLongitude());
+                                            loc.put("accuracy", (double) location.getAccuracy());
+
+                                            // Using NMEA Data to get MSL level altitude
+                                            if (mLastMslAltitude == null
+                                                    || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+                                                loc.put("altitude", location.getAltitude());
+                                            } else {
+                                                loc.put("altitude", mLastMslAltitude);
+                                            }
+
+                                            loc.put("speed", (double) location.getSpeed());
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                                loc.put("speed_accuracy",
+                                                        (double) location.getSpeedAccuracyMetersPerSecond());
+                                            }
+                                            loc.put("heading", (double) location.getBearing());
+                                            loc.put("time", (double) location.getTime());
+
+                                            if (getLocationResult != null) {
+                                                getLocationResult.success(loc);
+                                                getLocationResult = null;
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }).addOnFailureListener(activity, new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        if (e instanceof ResolvableApiException) {
+                            ResolvableApiException rae = (ResolvableApiException) e;
+                            int statusCode = rae.getStatusCode();
+                            switch (statusCode) {
+                            case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
+                                try {
+                                    // Show the dialog by calling startResolutionForResult(), and check the
+                                    // result in onActivityResult().
+                                    rae.startResolutionForResult(activity, REQUEST_CHECK_SETTINGS);
+                                } catch (IntentSender.SendIntentException sie) {
+                                    Log.i(TAG, "PendingIntent unable to execute request.");
+                                }
+                                break;
+                            }
+                        } else {
+                            ApiException ae = (ApiException) e;
+                            int statusCode = ae.getStatusCode();
+                            switch (statusCode) {
+                            case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
+                                // This error code happens during AirPlane mode.
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                    locationManager.addNmeaListener(mMessageListener);
+                                }
+                                mFusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback,
+                                        Looper.myLooper());
+                                break;
+                            default:
+                                // This should not happen according to Android documentation but it has been
+                                // observed on some phones.
+                                sendError("UNEXPECTED_ERROR", e.getMessage(), null);
+                                break;
+                            }
+                        }
+                    }
+                });
+    }
 }

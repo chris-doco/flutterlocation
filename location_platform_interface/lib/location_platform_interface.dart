@@ -61,6 +61,14 @@ class LocationPlatform extends PlatformInterface {
     throw UnimplementedError();
   }
 
+  /// Gets the true current location of the user. (Android only)
+  ///
+  /// Throws an error if the app has no permission to access location.
+  /// Returns a [LocationData] object.
+  Future<LocationData> getCurrentLocation() {
+    throw UnimplementedError();
+  }
+
   /// Checks if the app has permission to access location.
   ///
   /// If the result is [PermissionStatus.deniedForever], no dialog will be

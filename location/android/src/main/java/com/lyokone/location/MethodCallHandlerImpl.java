@@ -37,6 +37,9 @@ final class MethodCallHandlerImpl implements MethodCallHandler {
             case "getLocation":
                 onGetLocation(result);
                 break;
+            case "getCurrentLocation":
+                onGetCurrentLocation(result);
+                break;
             case "hasPermission":
                 onHasPermission(result);
                 break;
@@ -111,6 +114,15 @@ final class MethodCallHandlerImpl implements MethodCallHandler {
             location.requestPermissions();
         } else {
             location.startRequestingLocation();
+        }
+    }
+
+    private void onGetCurrentLocation(Result result) {
+        location.getLocationResult = result;
+        if (!location.checkPermissions()) {
+            location.requestPermissions();
+        } else {
+            location.getCurrentLocation();
         }
     }
 
