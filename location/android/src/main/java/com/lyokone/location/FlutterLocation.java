@@ -55,6 +55,7 @@ public class FlutterLocation
     private static LocationRequest mLocationRequest;
     private LocationSettingsRequest mLocationSettingsRequest;
     public LocationCallback mLocationCallback;
+    private OnCompleteListener<Location> mCurrentLocationCallback;
 
     @TargetApi(Build.VERSION_CODES.N)
     private OnNmeaMessageListener mMessageListener;
@@ -102,6 +103,7 @@ public class FlutterLocation
             mSettingsClient = LocationServices.getSettingsClient(activity);
 
             createLocationCallback();
+            createCurrentLocationCallback();
             createLocationRequest();
             buildLocationSettingsRequest();
         } else {
@@ -192,6 +194,7 @@ public class FlutterLocation
         this.distanceFilter = distanceFilter;
 
         createLocationCallback();
+        createCurrentLocationCallback();
         createLocationRequest();
         buildLocationSettingsRequest();
     }
@@ -245,7 +248,6 @@ public class FlutterLocation
                     if (mFusedLocationClient != null) {
                         mFusedLocationClient.removeLocationUpdates(mLocationCallback);
                     }
-                    mFusedLocationClient = null;
                 }
             }
         };
@@ -431,6 +433,44 @@ public class FlutterLocation
                 });
     }
 
+    private void createCurrentLocationCallback() {
+        mCurrentLocationCallback = new OnCompleteListener<Location>() {
+            @Override
+            public void onComplete(@NonNull Task<Location> task) {
+                if (task.isSuccessful()) {
+                    Location location = task.getResult();
+                    if (location != null) {
+                        HashMap<String, Double> loc = new HashMap<>();
+                        loc.put("latitude", location.getLatitude());
+                        loc.put("longitude", location.getLongitude());
+                        loc.put("accuracy", (double) location.getAccuracy());
+
+                        // Using NMEA Data to get MSL level altitude
+                        if (mLastMslAltitude == null
+                                || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+                            loc.put("altitude", location.getAltitude());
+                        } else {
+                            loc.put("altitude", mLastMslAltitude);
+                        }
+
+                        loc.put("speed", (double) location.getSpeed());
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            loc.put("speed_accuracy",
+                                    (double) location.getSpeedAccuracyMetersPerSecond());
+                        }
+                        loc.put("heading", (double) location.getBearing());
+                        loc.put("time", (double) location.getTime());
+
+                        if (getLocationResult != null) {
+                            getLocationResult.success(loc);
+                            getLocationResult = null;
+                        }
+                    }
+                }
+            }
+        };
+    }
+
     public void getCurrentLocation() {
         if (this.activity == null) {
             throw new ActivityNotFoundException();
@@ -446,41 +486,7 @@ public class FlutterLocation
                         if (mFusedLocationClient != null) {
                             Task<Location> locationTask = mFusedLocationClient.getCurrentLocation(locationAccuracy,
                                     null);
-                            locationTask.addOnCompleteListener(new OnCompleteListener<Location>() {
-                                @Override
-                                public void onComplete(@NonNull Task<Location> task) {
-                                    if (task.isSuccessful()) {
-                                        Location location = task.getResult();
-                                        if (location != null) {
-                                            HashMap<String, Double> loc = new HashMap<>();
-                                            loc.put("latitude", location.getLatitude());
-                                            loc.put("longitude", location.getLongitude());
-                                            loc.put("accuracy", (double) location.getAccuracy());
-
-                                            // Using NMEA Data to get MSL level altitude
-                                            if (mLastMslAltitude == null
-                                                    || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-                                                loc.put("altitude", location.getAltitude());
-                                            } else {
-                                                loc.put("altitude", mLastMslAltitude);
-                                            }
-
-                                            loc.put("speed", (double) location.getSpeed());
-                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                                loc.put("speed_accuracy",
-                                                        (double) location.getSpeedAccuracyMetersPerSecond());
-                                            }
-                                            loc.put("heading", (double) location.getBearing());
-                                            loc.put("time", (double) location.getTime());
-
-                                            if (getLocationResult != null) {
-                                                getLocationResult.success(loc);
-                                                getLocationResult = null;
-                                            }
-                                        }
-                                    }
-                                }
-                            });
+                            locationTask.addOnCompleteListener(mCurrentLocationCallback);
                         }
                     }
                 }).addOnFailureListener(activity, new OnFailureListener() {
@@ -509,8 +515,9 @@ public class FlutterLocation
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                                     locationManager.addNmeaListener(mMessageListener);
                                 }
-                                mFusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback,
-                                        Looper.myLooper());
+                                Task<Location> locationTask = mFusedLocationClient.getCurrentLocation(locationAccuracy,
+                                    null);
+                                locationTask.addOnCompleteListener(mCurrentLocationCallback);
                                 break;
                             default:
                                 // This should not happen according to Android documentation but it has been
